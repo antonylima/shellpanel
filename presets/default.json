@@ -1,0 +1,170 @@
+{
+  "name": "Comandos Padrão",
+  "description": "Conjunto inicial de comandos rápidos e utilitários para o dia a dia",
+  "version": "1.0.0",
+  "commands": [
+    {
+      "id": "git-status",
+      "title": "Git Status",
+      "command": "git status",
+      "category": "Git",
+      "color": "emerald",
+      "description": "Verifica estado atual do repositório",
+      "icon": "git-branch"
+    },
+    {
+      "id": "git-pull",
+      "title": "Git Pull",
+      "command": "git pull",
+      "category": "Git",
+      "color": "emerald",
+      "description": "Puxa alterações remotas",
+      "icon": "download"
+    },
+    {
+      "id": "git-log",
+      "title": "Git Log (Top 10)",
+      "command": "git log --oneline --graph -n 10",
+      "category": "Git",
+      "color": "emerald",
+      "description": "Exibe os últimos 10 commits formatados",
+      "icon": "git-commit"
+    },
+    {
+      "id": "git-branch",
+      "title": "Listar Branches",
+      "command": "git branch -a",
+      "category": "Git",
+      "color": "emerald",
+      "description": "Lista todas as branches locais e remotas",
+      "icon": "git-branch"
+    },
+    {
+      "id": "git-commit-prompt",
+      "title": "Git Commit Rápido",
+      "command": "git add . && git commit -m \"{mensagem}\"",
+      "category": "Git",
+      "color": "emerald",
+      "description": "Adiciona tudo e commita com mensagem solicitada",
+      "icon": "check-circle",
+      "params": [
+        {
+          "name": "mensagem",
+          "label": "Mensagem do Commit",
+          "default": "feat: atualizações"
+        }
+      ]
+    },
+    {
+      "id": "sys-ipconfig",
+      "title": "IP Config",
+      "command": "ipconfig",
+      "category": "Sistema & Rede",
+      "color": "blue",
+      "description": "Informações de IP e adaptadores de rede",
+      "icon": "network"
+    },
+    {
+      "id": "sys-ping",
+      "title": "Ping Google (8.8.8.8)",
+      "command": "ping 8.8.8.8 -n 4",
+      "category": "Sistema & Rede",
+      "color": "blue",
+      "description": "Testa conectividade de internet",
+      "icon": "activity"
+    },
+    {
+      "id": "sys-ports",
+      "title": "Portas Abertas (Listening)",
+      "command": "netstat -ano | findstr LISTENING",
+      "category": "Sistema & Rede",
+      "color": "blue",
+      "description": "Lista portas locais em escuta",
+      "icon": "server"
+    },
+    {
+      "id": "sys-dir",
+      "title": "Listar Arquivos (dir)",
+      "command": "dir",
+      "category": "Sistema & Rede",
+      "color": "blue",
+      "description": "Lista arquivos e pastas do diretório atual",
+      "icon": "folder"
+    },
+    {
+      "id": "node-version",
+      "title": "Versão Node & NPM",
+      "command": "node -v; npm.cmd -v",
+      "category": "Node & JS",
+      "color": "amber",
+      "description": "Verifica versões instaladas",
+      "icon": "code"
+    },
+    {
+      "id": "npm-outdated",
+      "title": "NPM Outdated",
+      "command": "npm.cmd outdated",
+      "category": "Node & JS",
+      "color": "amber",
+      "description": "Verifica pacotes desatualizados",
+      "icon": "package"
+    },
+    {
+      "id": "npm-list",
+      "title": "NPM List Top-level",
+      "command": "npm.cmd list --depth=0",
+      "category": "Node & JS",
+      "color": "amber",
+      "description": "Lista pacotes instalados de nível 0",
+      "icon": "list"
+    },
+    {
+      "id": "docker-ps",
+      "title": "Docker Containers",
+      "command": "docker ps -a",
+      "category": "Docker",
+      "color": "cyan",
+      "description": "Lista todos os containers Docker",
+      "icon": "box"
+    },
+    {
+      "id": "docker-images",
+      "title": "Docker Imagens",
+      "command": "docker images",
+      "category": "Docker",
+      "color": "cyan",
+      "description": "Lista imagens docker locais",
+      "icon": "layers"
+    },
+    {
+      "id": "util-explorer",
+      "title": "Abrir Explorer Aqui",
+      "command": "explorer .",
+      "category": "Utilitários",
+      "color": "purple",
+      "description": "Abre a pasta atual no Windows Explorer",
+      "icon": "external-link"
+    },
+    {
+      "id": "util-custom-ping",
+      "title": "Ping Personalizado",
+      "command": "ping {host} -n {count}",
+      "category": "Utilitários",
+      "color": "purple",
+      "description": "Executa ping em host/ip customizado",
+      "icon": "terminal",
+      "params": [
+        {
+          "name": "host",
+          "label": "Host / Domínio / IP",
+          "default": "google.com"
+        },
+        {
+          "name": "count",
+          "label": "Quantidade de pacotes",
+          "default": "4"
+        }
+      ]
+    }
+  ]
+}

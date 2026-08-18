@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShellPanel - Painel Híbrido (Windows / Ubuntu)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-theme-env="windows">
+  <div class="app-container">
+    <!-- TOP HEADER -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo">
+          <div class="logo-icon" id="logoIcon">⚡</div>
+          <div class="logo-text">
+            <h1>ShellPanel</h1>
+            <span class="version-tag">Híbrido</span>
+          </div>
+        </div>
+
+        <!-- OS TOGGLE (WINDOWS / UBUNTU) -->
+        <div class="os-toggle-group" title="Alternar ambiente de execução">
+          <button type="button" class="os-toggle-btn active" id="btnEnvWindows" data-env="windows">
+            <span class="os-icon">🪟</span>
+            <span class="os-label">Windows</span>
+          </button>
+          <button type="button" class="os-toggle-btn" id="btnEnvUbuntu" data-env="ubuntu">
+            <span class="os-icon">🐧</span>
+            <span class="os-label">Ubuntu</span>
+          </button>
+        </div>
+
+        <!-- PRESET SELECTOR -->
+        <div class="preset-selector-container">
+          <label for="presetSelect" class="sr-only">Perfil de Comandos</label>
+          <div class="select-wrapper">
+            <span class="select-icon">📁</span>
+            <select id="presetSelect" title="Selecionar arquivo de preset"></select>
+          </div>
+          <button id="btnManagePresets" class="btn btn-secondary btn-icon" title="Gerenciar arquivos e presets">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <span>Arquivos</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <!-- CWD INDICATOR -->
+        <div class="cwd-badge" id="cwdBadge" title="Clique para alterar a pasta de execução">
+          <span class="cwd-icon">📂</span>
+          <span class="cwd-path" id="cwdDisplay">Carregando pasta...</span>
+          <span class="cwd-edit-hint">Editar</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- SHELL SELECTOR (Contextual) -->
+        <div class="shell-selector">
+          <span class="shell-label">Shell:</span>
+          <select id="shellSelect" class="shell-select">
+            <option value="powershell" selected>PowerShell</option>
+            <option value="cmd">CMD</option>
+          </select>
+        </div>
+
+        <!-- WS STATUS -->
+        <div class="status-indicator" id="wsStatus" title="Status da Conexão com o Servidor">
+          <span class="status-dot"></span>
+          <span class="status-text">Conectando...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- QUICK RUNNER BAR (INSERIDO NA HORA) -->
+    <section class="quick-runner-section">
+      <div class="quick-runner-card">
+        <div class="quick-runner-prefix" id="quickRunnerPrefix">
+          <span class="env-tag-badge" id="currentEnvBadge">🪟 WIN</span>
+          <span class="terminal-prompt-symbol" id="promptSymbol">PS &gt;</span>
+        </div>
+        <div class="quick-runner-input-wrap">
+          <input 
+            type="text" 
+            id="quickCommandInput" 
+            placeholder="Digite qualquer comando na hora... [Enter para executar]" 
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <div class="quick-runner-actions">
+          <button id="btnQuickRun" class="btn btn-primary" title="Executar comando agora (Enter)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>Executar</span>
+          </button>
+          <button id="btnQuickSave" class="btn btn-outline" title="Salvar este comando como um botão">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>Salvar Botão</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAIN WORKSPACE -->
+    <main class="app-main">
+      <!-- COMMAND BUTTONS PANEL -->
+      <section class="commands-section">
+        <div class="section-toolbar">
+          <div class="toolbar-left">
+            <div class="search-box">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="searchInput" placeholder="Filtrar botões (Ctrl+F)..." />
+            </div>
+
+            <!-- CATEGORY CHIPS -->
+            <div class="category-chips" id="categoryChips">
+              <button class="chip active" data-category="all">Todos</button>
+            </div>
+          </div>
+
+          <div class="toolbar-right">
+            <button id="btnNewCommand" class="btn btn-success">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Novo Botão</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- COMMANDS GRID -->
+        <div class="commands-grid" id="commandsGrid">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div class="empty-state hidden" id="emptyState">
+          <div class="empty-icon">🔍</div>
+          <h3>Nenhum comando encontrado</h3>
+          <p>Tente ajustar a busca ou adicione um novo botão de comando.</p>
+          <button id="btnEmptyNewCommand" class="btn btn-primary">Criar Novo Comando</button>
+        </div>
+      </section>
+
+      <!-- TERMINAL OUTPUT PANEL -->
+      <section class="terminal-section" id="terminalSection">
+        <div class="terminal-header">
+          <div class="terminal-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+            <span>Terminal Output</span>
+            <span id="activeProcessBadge" class="process-badge hidden">
+              <span class="pulse-dot"></span> Executando... <span id="processTimer">0.0s</span>
+            </span>
+          </div>
+
+          <div class="terminal-controls">
+            <button id="btnKillProcess" class="btn btn-danger btn-sm hidden" title="Interromper processo ativo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>
+              <span>Parar</span>
+            </button>
+            <button id="btnAutoScroll" class="btn btn-ghost btn-sm active" title="Rolar automaticamente">
+              Auto-scroll
+            </button>
+            <button id="btnCopyTerminal" class="btn btn-ghost btn-sm" title="Copiar saída do terminal">
+              Copiar
+            </button>
+            <button id="btnClearTerminal" class="btn btn-ghost btn-sm" title="Limpar terminal">
+              Limpar
+            </button>
+          </div>
+        </div>
+
+        <!-- TERMINAL SCREEN -->
+        <div class="terminal-body" id="terminalBody">
+          <div class="terminal-welcome">
+            <p class="text-muted">✨ Pronto para executar comandos. Escolha Windows ou Ubuntu acima e clique em um botão ou digite na barra rápida.</p>
+          </div>
+          <pre id="terminalOutput" class="terminal-output"></pre>
+        </div>
+
+        <!-- TERMINAL STDIN (INTERACTIVE INPUT) -->
+        <div class="terminal-stdin-bar" id="terminalStdinBar">
+          <span class="stdin-label">&gt;</span>
+          <input type="text" id="stdinInput" placeholder="Enviar entrada (stdin) para o processo ativo... [Enter]" autocomplete="off" />
+          <button id="btnSendStdin" class="btn btn-ghost btn-sm">Enviar</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL: NOVO / EDITAR COMANDO -->
+  <div class="modal-overlay hidden" id="commandModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="commandModalTitle">Criar Novo Botão de Comando</h3>
+        <button class="modal-close" data-close="commandModal">&times;</button>
+      </div>
+      <form id="commandForm" class="modal-body">
+        <input type="hidden" id="cmdEditId" />
+
+        <div class="form-group">
+          <label for="cmdTitle">Nome do Botão *</label>
+          <input type="text" id="cmdTitle" placeholder="Ex: Git Pull, Iniciar Dev Server, Docker Status" required />
+        </div>
+
+        <div class="form-group">
+          <label for="cmdText">Comando do Terminal *</label>
+          <textarea id="cmdText" rows="3" placeholder="Ex: sudo apt update&#10;Dica: Use {parametro} para solicitar texto antes de rodar!" required></textarea>
+          <small class="form-hint">Dica: use chaves como <code>{nome}</code> ou <code>{branch}</code> para parâmetros dinâmicos.</small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="cmdCategory">Categoria / Grupo</label>
+            <input type="text" id="cmdCategory" placeholder="Ex: Git, Docker, Build, Scripts" list="categoryDatalist" />
+            <datalist id="categoryDatalist"></datalist>
+          </div>
+          <div class="form-group flex-1">
+            <label for="cmdColor">Cor do Botão</label>
+            <select id="cmdColor">
+              <option value="emerald">Verde Esmeralda</option>
+              <option value="blue">Azul</option>
+              <option value="purple">Roxo</option>
+              <option value="amber">Âmbar / Laranja</option>
+              <option value="cyan">Ciano</option>
+              <option value="rose">Rosa / Vermelho</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="cmdDescription">Descrição / Dica (Opcional)</label>
+          <input type="text" id="cmdDescription" placeholder="Ex: Puxa commits mais recentes da branch atual" />
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="commandModal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btnSaveCommand">Salvar Comando</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: GERENCIAR PRESETS / ARQUIVOS -->
+  <div class="modal-overlay hidden" id="presetsModal">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3>Arquivos & Perfis de Comandos</h3>
+        <button class="modal-close" data-close="presetsModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="presets-manager-tabs">
+          <div class="presets-list-section">
+            <h4>Arquivos Salvos (.json)</h4>
+            <div class="presets-list" id="presetsList">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+          <div class="presets-actions-section">
+            <h4>Ações de Perfil</h4>
+            <div class="preset-action-box">
+              <label>Salvar Perfil Atual Como:</label>
+              <div class="input-with-btn">
+                <input type="text" id="newPresetName" placeholder="nome-do-perfil" />
+                <button id="btnSaveAsPreset" class="btn btn-primary">Salvar</button>
+              </div>
+            </div>
+
+            <div class="preset-action-box">
+              <label>Importar / Enviar Arquivo JSON:</label>
+              <input type="file" id="importFileInput" accept=".json" class="file-input" />
+              <button id="btnImportFile" class="btn btn-outline full-width">Carregar do Meu Computador</button>
+            </div>
+
+            <div class="preset-action-box">
+              <label>Exportar Perfil Atual:</label>
+              <button id="btnExportFile" class="btn btn-secondary full-width">Baixar JSON Atual</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="presetsModal">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PARÂMETROS DINÂMICOS -->
+  <div class="modal-overlay hidden" id="paramsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="paramsModalTitle">Preencher Parâmetros</h3>
+        <button class="modal-close" data-close="paramsModal">&times;</button>
+      </div>
+      <form id="paramsForm" class="modal-body">
+        <div class="params-command-preview">
+          <label>Comando:</label>
+          <code id="paramsCommandPreview"></code>
+        </div>
+        <div id="paramsFieldsContainer">
+          <!-- Dynamic param inputs -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="paramsModal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Executar com Parâmetros</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ALTERAR DIRETÓRIO (CWD) -->
+  <div class="modal-overlay hidden" id="cwdModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Alterar Pasta de Trabalho (CWD)</h3>
+        <button class="modal-close" data-close="cwdModal">&times;</button>
+      </div>
+      <form id="cwdForm" class="modal-body">
+        <div class="form-group">
+          <label for="newCwdInput">Caminho da Pasta no Computador:</label>
+          <input type="text" id="newCwdInput" placeholder="Ex: C:\Users\nome\projetos\meu-app" required />
+          <small class="form-hint">Os comandos do terminal serão executados neste diretório.</small>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="cwdModal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Definir Pasta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATIONS -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

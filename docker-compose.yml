@@ -1,0 +1,11 @@
+services:
+  shellpanel:
+    build: .
+    container_name: shellpanel
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./presets:/app/presets
+    environment:
+      - PORT=3000

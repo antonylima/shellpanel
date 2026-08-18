@@ -1,0 +1,16 @@
+{
+  "name": "shellpanel",
+  "version": "1.0.0",
+  "description": "Painel visual para envio e gerenciamento de comandos no terminal",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["terminal", "panel", "commands", "dashboard", "cli", "shell"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,163 @@
+{
+  "name": "Ubuntu / Linux",
+  "description": "Comandos essenciais para ambiente Ubuntu / Linux via WSL",
+  "version": "1.0.0",
+  "commands": [
+    {
+      "id": "ub-info",
+      "title": "Versão do Ubuntu",
+      "command": "lsb_release -a && uname -r",
+      "category": "Sistema",
+      "color": "amber",
+      "description": "Exibe informações da distribuição Ubuntu e kernel",
+      "icon": "info"
+    },
+    {
+      "id": "ub-ls",
+      "title": "Listar Detalhado (ls -la)",
+      "command": "ls -la --color=auto",
+      "category": "Arquivos",
+      "color": "cyan",
+      "description": "Lista arquivos com permissões, tamanho e cores",
+      "icon": "folder"
+    },
+    {
+      "id": "ub-df",
+      "title": "Uso de Disco (df -h)",
+      "command": "df -h -x tmpfs -x devtmpfs",
+      "category": "Sistema",
+      "color": "amber",
+      "description": "Espaço livre e ocupado nos discos montados",
+      "icon": "hard-drive"
+    },
+    {
+      "id": "ub-free",
+      "title": "Memória RAM (free -h)",
+      "command": "free -h",
+      "category": "Sistema",
+      "color": "amber",
+      "description": "Exibe consumo de memória RAM e Swap",
+      "icon": "cpu"
+    },
+    {
+      "id": "ub-apt-update",
+      "title": "APT Update",
+      "command": "sudo apt update",
+      "category": "Pacotes (APT)",
+      "color": "rose",
+      "description": "Atualiza índice de repositórios do Ubuntu",
+      "icon": "refresh-cw"
+    },
+    {
+      "id": "ub-apt-upgrade-list",
+      "title": "Listar Atualizáveis",
+      "command": "apt list --upgradable",
+      "category": "Pacotes (APT)",
+      "color": "rose",
+      "description": "Lista programas com atualizações disponíveis",
+      "icon": "list"
+    },
+    {
+      "id": "ub-apt-search",
+      "title": "Buscar Pacote APT",
+      "command": "apt-cache search {termo}",
+      "category": "Pacotes (APT)",
+      "color": "rose",
+      "description": "Busca programas disponíveis nos repositórios",
+      "icon": "search",
+      "params": [
+        {
+          "name": "termo",
+          "label": "Nome ou termo a buscar",
+          "default": "curl"
+        }
+      ]
+    },
+    {
+      "id": "ub-ps",
+      "title": "Top Processos",
+      "command": "ps aux --sort=-%mem | head -n 15",
+      "category": "Processos",
+      "color": "purple",
+      "description": "Lista os 15 processos que mais consomem memória",
+      "icon": "activity"
+    },
+    {
+      "id": "ub-ports",
+      "title": "Portas em Escuta",
+      "command": "ss -tuln",
+      "category": "Rede",
+      "color": "blue",
+      "description": "Lista portas e sockets TCP/UDP ativos",
+      "icon": "server"
+    },
+    {
+      "id": "ub-ip",
+      "title": "IPs da Rede (ip a)",
+      "command": "ip -brief address",
+      "category": "Rede",
+      "color": "blue",
+      "description": "Interfaces de rede e endereços IP alocados",
+      "icon": "network"
+    },
+    {
+      "id": "ub-ping",
+      "title": "Ping Google (8.8.8.8)",
+      "command": "ping -c 4 8.8.8.8",
+      "category": "Rede",
+      "color": "blue",
+      "description": "Testa latência e perda de pacotes",
+      "icon": "wifi"
+    },
+    {
+      "id": "ub-curl-headers",
+      "title": "Testar URL (Curl Headers)",
+      "command": "curl -I {url}",
+      "category": "Rede",
+      "color": "blue",
+      "description": "Consulta cabeçalhos HTTP de uma URL",
+      "icon": "globe",
+      "params": [
+        {
+          "name": "url",
+          "label": "URL a testar",
+          "default": "https://google.com"
+        }
+      ]
+    },
+    {
+      "id": "ub-git-status",
+      "title": "Git Status (Linux)",
+      "command": "git status",
+      "category": "Git",
+      "color": "emerald",
+      "description": "Verifica alterações no repositório",
+      "icon": "git-branch"
+    },
+    {
+      "id": "ub-docker-ps",
+      "title": "Docker Containers (Linux)",
+      "command": "docker ps -a",
+      "category": "Docker",
+      "color": "cyan",
+      "description": "Lista containers Docker ativos e inativos",
+      "icon": "box"
+    },
+    {
+      "id": "ub-grep-find",
+      "title": "Buscar Texto em Arquivos",
+      "command": "grep -rnI \"{texto}\" . --exclude-dir={node_modules,.git}",
+      "category": "Arquivos",
+      "color": "cyan",
+      "description": "Pesquisa recursiva de texto no diretório",
+      "icon": "search",
+      "params": [
+        {
+          "name": "texto",
+          "label": "Texto a pesquisar",
+          "default": "TODO"
+        }
+      ]
+    }
+  ]
+}
