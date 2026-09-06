@@ -146,18 +146,82 @@
     {
       "id": "ub-grep-find",
       "title": "Buscar Texto em Arquivos",
-      "command": "grep -rnI \"{texto}\" . --exclude-dir={node_modules,.git}",
+      "command": "grep -rnl \"{texto}\" . --exclude-dir={node_modules,.git}",
       "category": "Arquivos",
       "color": "cyan",
-      "description": "Pesquisa recursiva de texto no diretório",
-      "icon": "search",
-      "params": [
-        {
-          "name": "texto",
-          "label": "Texto a pesquisar",
-          "default": "TODO"
-        }
-      ]
+      "description": "Pesquisa recursiva de texto no diretório"
+    },
+    {
+      "id": "cmd_1787055635692",
+      "title": "Ollama Key",
+      "command": "jq '.models.providers[\"ollama-cloud\"].apiKey = \"{k}\"' openclaw.json > temp.json && mv temp.json openclaw.json",
+      "category": "Openclaw",
+      "color": "rose",
+      "description": "Alter openclaw ollama key"
+    },
+    {
+      "id": "cmd_1787057978887",
+      "title": "kill Openclaw",
+      "command": "pkill -9 -f \"openclaw\" || kill -9 $(lsof -t -i:18789)",
+      "category": "Openclaw",
+      "color": "emerald",
+      "description": ""
+    },
+    {
+      "id": "cmd_1787058106536",
+      "title": "Start Openclaw",
+      "command": "/bin/bash -lc \"script -q -c 'openclaw gateway' /dev/null\" > /dev/null 2>&1 &",
+      "category": "Openclaw",
+      "color": "rose",
+      "description": ""
+    },
+    {
+      "id": "cmd_1787059179815",
+      "title": "Start Openclaw nohup",
+      "command": "nohup openclaw gateway > openclaw.log 2>&1 &",
+      "category": "Openclaw",
+      "color": "emerald",
+      "description": ""
+    },
+    {
+      "id": "cmd_1787080069945",
+      "title": "Status n8n",
+      "command": "pgrep -f \"n8n start\" > /dev/null && echo \"✅ n8n ONLINE\" || echo \"❌ n8n OFFLINE\"",
+      "category": "N8N",
+      "color": "amber",
+      "description": ""
+    },
+    {
+      "id": "cmd_1787080287855",
+      "title": "Kill n8n",
+      "command": "pkill -9 -f n8n </dev/null >/dev/null 2>&1",
+      "category": "N8N",
+      "color": "amber",
+      "description": ""
+    },
+    {
+      "id": "cmd_1787085240781",
+      "title": "Status openclaw",
+      "command": "ps aux | grep -v grep | grep -q \"openclaw\" && echo \"online\" || echo \"offline\"",
+      "category": "Openclaw",
+      "color": "amber",
+      "description": ""
+    },
+    {
+      "id": "cmd_1787104533163",
+      "title": "Ollama Key S",
+      "command": "set -a && source .env && set +a && jq '.models.providers[\"ollama-cloud\"].apiKey = env.OL{Ok}' openclaw.json > temp.json && mv temp.json openclaw.json",
+      "category": "Openclaw",
+      "color": "rose",
+      "description": "Alter openclaw ollama key"
+    },
+    {
+      "id": "cmd_1787567460168",
+      "title": "Ollama Key S (Cópia)",
+      "command": "set -a && source .env && set +a && jq '.models.providers[\"ollama-cloud\"].apiKey = env.OL{Ok}' openclaw.json > temp.json && mv temp.json openclaw.json",
+      "category": "Openclaw",
+      "color": "rose",
+      "description": "Alter openclaw ollama key"
     }
   ]
 }
