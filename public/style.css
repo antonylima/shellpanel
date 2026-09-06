@@ -1521,12 +1521,20 @@ textarea,
 
   .toolbar-right {
     width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
   }
 
   .toolbar-right .btn {
-    width: 100%;
+    flex: 1;
     min-height: 42px;
     justify-content: center;
+  }
+
+  .toolbar-right .cloud-sync-badge {
+    padding: 8px 12px;
   }
 
   .commands-grid {

@@ -123,6 +123,9 @@ const newCwdInput = document.getElementById('newCwdInput');
 // Cloud Sync & SQL Setup Modals
 const cloudSyncBadge = document.getElementById('cloudSyncBadge');
 const cloudSyncText = document.getElementById('cloudSyncText');
+const btnSyncLocalToCloud = document.getElementById('btnSyncLocalToCloud');
+const btnUploadPresetToSupabase = document.getElementById('btnUploadPresetToSupabase');
+const btnMobileSyncLocalToCloud = document.getElementById('btnMobileSyncLocalToCloud');
 const sqlModal = document.getElementById('sqlModal');
 const btnCopySql = document.getElementById('btnCopySql');
 const sqlCodeContent = document.getElementById('sqlCodeContent');
@@ -292,6 +295,26 @@ function setupEventListeners() {
       } else {
         showToast(`Sincronizado: ${cloudSyncText.textContent}`, 'info');
       }
+    });
+  }
+
+  // Sync Local to Cloud Button Handlers
+  if (btnSyncLocalToCloud) {
+    btnSyncLocalToCloud.addEventListener('click', () => {
+      uploadLocalCommandsToSupabase();
+    });
+  }
+
+  if (btnUploadPresetToSupabase) {
+    btnUploadPresetToSupabase.addEventListener('click', () => {
+      uploadCurrentPresetToSupabase();
+    });
+  }
+
+  if (btnMobileSyncLocalToCloud) {
+    btnMobileSyncLocalToCloud.addEventListener('click', () => {
+      closeMobileDrawer();
+      uploadLocalCommandsToSupabase();
     });
   }
 
@@ -739,6 +762,91 @@ async function loadCommands() {
     updateCloudBadge('local');
     renderCategoryChips();
     renderCommands();
+  }
+}
+
+// Upload all local presets (Windows & Ubuntu) directly to Supabase
+async function uploadLocalCommandsToSupabase() {
+  if (!authRequired || !authToken) {
+    showToast('Você precisa estar autenticado com o Supabase para subir comandos.', 'warning');
+    return;
+  }
+
+  showToast('Subindo comandos locais para a nuvem...', 'info');
+
+  try {
+    const res = await apiFetch('/api/commands/seed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ overwrite: false })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      showToast(`Sucesso! ${data.count} comandos locais foram sincronizados na nuvem.`, 'success');
+      updateCloudBadge('synced');
+      await loadCommands();
+    } else if (data.tableMissing) {
+      updateCloudBadge('pending');
+      openModal(sqlModal);
+      showToast('A tabela no Supabase ainda não foi criada. Execute o script SQL exibido na tela.', 'warning');
+    } else {
+      showToast(data.error || 'Erro ao subir comandos locais', 'error');
+    }
+  } catch (err) {
+    console.error('Erro ao chamar /api/commands/seed:', err);
+    showToast('Erro de conexão ao sincronizar comandos com a nuvem.', 'error');
+  }
+}
+
+// Upload currently open preset's commands to Supabase for current environment
+async function uploadCurrentPresetToSupabase() {
+  if (!authRequired || !authToken) {
+    showToast('Você precisa estar autenticado com o Supabase para subir comandos.', 'warning');
+    return;
+  }
+
+  const cmds = (currentPreset && Array.isArray(currentPreset.commands)) ? currentPreset.commands : [];
+  if (cmds.length === 0) {
+    showToast('Nenhum comando no perfil atual para subir.', 'warning');
+    return;
+  }
+
+  showToast(`Subindo ${cmds.length} comandos do perfil atual para o Supabase...`, 'info');
+
+  try {
+    const cmdsWithEnv = cmds.map(c => ({
+      ...c,
+      environment: currentEnv
+    }));
+
+    const res = await apiFetch('/api/commands/seed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        env: currentEnv,
+        commands: cmdsWithEnv,
+        overwrite: false
+      })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      showToast(`${data.count} comandos do perfil foram salvos no Supabase!`, 'success');
+      closeModal(presetsModal);
+      await loadCommands();
+    } else if (data.tableMissing) {
+      updateCloudBadge('pending');
+      openModal(sqlModal);
+      showToast('A tabela no Supabase ainda não foi criada. Execute o script SQL exibido na tela.', 'warning');
+    } else {
+      showToast(data.error || 'Erro ao subir perfil', 'error');
+    }
+  } catch (err) {
+    console.error('Erro ao subir perfil para o Supabase:', err);
+    showToast('Erro de conexão ao sincronizar perfil com o Supabase.', 'error');
   }
 }
 

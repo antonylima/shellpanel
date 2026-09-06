@@ -476,41 +476,86 @@ app.delete('/api/commands/:id', async (req, res) => {
   }
 });
 
-// POST /api/commands/seed - Sincroniza / importa comandos padrão para o Supabase
+// POST /api/commands/seed - Sobe comandos locais para o Supabase (upsert)
 app.post('/api/commands/seed', async (req, res) => {
-  const targetEnv = req.body.env || 'windows';
+  const targetEnv = req.body.env; // se omitido, sobe ambos ('windows' e 'ubuntu')
   const overwrite = Boolean(req.body.overwrite);
+  const customCommands = req.body.commands; // se fornecido array, sobe esses comandos diretamente
 
   if (!isAuthEnabled || !req.token) {
     return res.status(400).json({ error: 'Autenticação Supabase necessária para sincronizar comandos.' });
   }
 
   const userSupabase = getUserSupabaseClient(req.token);
-  const presetFile = targetEnv === 'ubuntu' ? 'ubuntu.json' : 'default.json';
-  const filePath = path.join(PRESETS_DIR, presetFile);
-
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: 'Arquivo padrão não encontrado' });
-  }
 
   try {
-    if (overwrite) {
-      await userSupabase.from('commands').delete().eq('environment', targetEnv);
+    let toInsert = [];
+
+    if (Array.isArray(customCommands) && customCommands.length > 0) {
+      toInsert = customCommands.map(c => ({
+        id: c.id || ('cmd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)),
+        user_id: req.user.id,
+        title: (c.title || 'Sem título').trim(),
+        command: (c.command || '').trim(),
+        category: (c.category || 'Geral').trim(),
+        color: c.color || (c.environment === 'ubuntu' ? 'amber' : 'emerald'),
+        description: (c.description || '').trim(),
+        environment: c.environment || targetEnv || 'windows',
+        updated_at: new Date().toISOString()
+      }));
+    } else {
+      // Ler arquivos presets locais
+      const envConfigs = [
+        { env: 'windows', file: 'default.json' },
+        { env: 'ubuntu', file: 'ubuntu.json' }
+      ];
+
+      const filteredEnvs = targetEnv && targetEnv !== 'all'
+        ? envConfigs.filter(cfg => cfg.env === targetEnv)
+        : envConfigs;
+
+      for (const { env, file } of filteredEnvs) {
+        const filePath = path.join(PRESETS_DIR, file);
+        if (fs.existsSync(filePath)) {
+          try {
+            const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            const cmds = (content.commands || []).map(c => ({
+              id: c.id || ('cmd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)),
+              user_id: req.user.id,
+              title: (c.title || 'Sem título').trim(),
+              command: (c.command || '').trim(),
+              category: (c.category || 'Geral').trim(),
+              color: c.color || (env === 'ubuntu' ? 'amber' : 'emerald'),
+              description: (c.description || '').trim(),
+              environment: env,
+              updated_at: new Date().toISOString()
+            }));
+            toInsert.push(...cmds);
+          } catch (e) {
+            console.error(`Erro ao ler preset ${file}:`, e);
+          }
+        }
+      }
     }
 
-    const presetData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    const toInsert = (presetData.commands || []).map(c => ({
-      id: c.id || ('cmd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)),
-      user_id: req.user.id,
-      title: c.title,
-      command: c.command,
-      category: c.category || 'Geral',
-      color: c.color || (targetEnv === 'ubuntu' ? 'amber' : 'emerald'),
-      description: c.description || '',
-      environment: targetEnv
-    }));
+    if (toInsert.length === 0) {
+      return res.status(400).json({ error: 'Nenhum comando local encontrado para subir.' });
+    }
 
-    const { data, error } = await userSupabase.from('commands').insert(toInsert).select();
+    if (overwrite) {
+      let deleteQuery = userSupabase.from('commands').delete();
+      if (targetEnv && targetEnv !== 'all') {
+        deleteQuery = deleteQuery.eq('environment', targetEnv);
+      }
+      await deleteQuery;
+    }
+
+    // Upsert para não duplicar IDs existentes
+    const { data, error } = await userSupabase
+      .from('commands')
+      .upsert(toInsert, { onConflict: 'id' })
+      .select();
+
     if (error) {
       const isTableMissing = error.code === '42P01' || (error.message && error.message.includes('relation'));
       return res.status(400).json({ error: error.message, tableMissing: isTableMissing });
@@ -518,7 +563,7 @@ app.post('/api/commands/seed', async (req, res) => {
 
     res.json({ success: true, count: (data || []).length, commands: data });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Erro ao subir comandos para o Supabase: ' + err.message });
   }
 });
 
