@@ -26,11 +26,18 @@ O projeto foi projetado para rodar em **qualquer ambiente sem configurações es
    ```bash
    npm install
    ```
-3. Inicie o servidor:
+3. Configure as credenciais no arquivo `.env` (baseie-se no `.env.example`):
+   ```env
+   PORT=3000
+   HOST=0.0.0.0
+   SUPABASE_URL=https://seu-projeto.supabase.co
+   SUPABASE_ANON_KEY=sua-chave-anon-publica-do-supabase
+   ```
+4. Inicie o servidor:
    ```bash
    npm start
    ```
-4. Acesse: **`http://localhost:3000`** *(ou o IP da máquina na porta 3000)*
+5. Acesse: **`http://localhost:3000`** *(faça login com as credenciais cadastradas no Supabase)*
 
 ---
 

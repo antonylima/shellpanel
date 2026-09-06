@@ -1,10 +1,13 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
+global.WebSocket = WebSocket;
 const path = require('path');
 const fs = require('fs');
 const { spawn, execSync, exec } = require('child_process');
 const os = require('os');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,6 +17,20 @@ const PORT = parseInt(process.env.PORT, 10) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const PRESETS_DIR = path.join(__dirname, 'presets');
 
+// Supabase Auth Setup
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
+const SUPABASE_ANON_KEY = (process.env.SUPABASE_ANON_KEY || '').trim();
+const isAuthEnabled = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+const supabase = isAuthEnabled ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false
+  },
+  realtime: {
+    transport: WebSocket
+  }
+}) : null;
+
 // Ensure presets directory exists
 if (!fs.existsSync(PRESETS_DIR)) {
   fs.mkdirSync(PRESETS_DIR, { recursive: true });
@@ -21,6 +38,47 @@ if (!fs.existsSync(PRESETS_DIR)) {
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Public Auth Configuration Endpoint
+app.get('/api/auth/config', (req, res) => {
+  res.json({
+    authRequired: isAuthEnabled,
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY
+  });
+});
+
+// Middleware for Authenticated REST API Endpoints
+async function requireAuth(req, res, next) {
+  if (!isAuthEnabled) {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Acesso não autorizado. Faça login para continuar.' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
+    }
+    req.user = user;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Falha na validação da sessão: ' + err.message });
+  }
+}
+
+// Protect all /api endpoints below, except /api/auth/config
+app.use('/api', (req, res, next) => {
+  if (req.path === '/auth/config') {
+    return next();
+  }
+  return requireAuth(req, res, next);
+});
 
 // Store active processes: id -> { process, cwd, command, startTime }
 const activeProcesses = new Map();
@@ -215,7 +273,31 @@ function killProcessTree(pid) {
 }
 
 // WebSocket Connection Handling
-wss.on('connection', (ws) => {
+wss.on('connection', async (ws, req) => {
+  if (isAuthEnabled) {
+    try {
+      const parsedUrl = new URL(req.url, 'http://localhost');
+      const token = parsedUrl.searchParams.get('token');
+
+      if (!token) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Token de autenticação ausente. Acesso negado.' }));
+        ws.close(4001, 'Unauthorized');
+        return;
+      }
+
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (error || !user) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Sessão inválida ou expirada. Conexão rejeitada.' }));
+        ws.close(4001, 'Unauthorized');
+        return;
+      }
+    } catch (err) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Erro ao autenticar conexão: ' + err.message }));
+      ws.close(4001, 'Auth Error');
+      return;
+    }
+  }
+
   const clientProcesses = new Set();
 
   ws.on('message', (messageText) => {
@@ -416,5 +498,6 @@ server.listen(PORT, HOST, () => {
   console.log(`🖥️  Sistema Operacional Host: ${osName} (${caps.platform})`);
   console.log(`🌐 Acesse no seu navegador: http://localhost:${PORT}`);
   console.log(`📁 Diretório Inicial: ${currentDefaultCwd}`);
+  console.log(`🔐 Autenticação Supabase: ${isAuthEnabled ? 'ATIVADA (Protegido por Supabase Auth)' : 'DESATIVADA (Preencha o .env para ativar)'}`);
   console.log(`====================================================`);
 });

@@ -1,5 +1,10 @@
 // ShellPanel Frontend Client Logic (Portable Hybrid Windows / Ubuntu / Linux)
 
+// Supabase Auth State
+let authToken = null;
+let supabaseClient = null;
+let authRequired = false;
+
 let currentEnv = 'windows'; // 'windows' | 'ubuntu'
 let socket = null;
 let currentPreset = {
@@ -16,7 +21,21 @@ let autoScroll = true;
 let currentCwd = "";
 let serverInfo = {};
 
-// DOM Elements
+// DOM Elements: Supabase Auth
+const loginOverlay = document.getElementById('loginOverlay');
+const loginForm = document.getElementById('loginForm');
+const loginEmail = document.getElementById('loginEmail');
+const loginPassword = document.getElementById('loginPassword');
+const loginErrorAlert = document.getElementById('loginErrorAlert');
+const btnLoginSubmit = document.getElementById('btnLoginSubmit');
+const loginSpinner = document.getElementById('loginSpinner');
+const loginEnvNotice = document.getElementById('loginEnvNotice');
+const userProfileBadge = document.getElementById('userProfileBadge');
+const userEmailDisplay = document.getElementById('userEmailDisplay');
+const userAvatar = document.getElementById('userAvatar');
+const btnLogout = document.getElementById('btnLogout');
+
+// DOM Elements: General
 const wsStatus = document.getElementById('wsStatus');
 const presetSelect = document.getElementById('presetSelect');
 const cwdDisplay = document.getElementById('cwdDisplay');
@@ -77,12 +96,24 @@ const cwdModal = document.getElementById('cwdModal');
 const cwdForm = document.getElementById('cwdForm');
 const newCwdInput = document.getElementById('newCwdInput');
 
-// Initialize
+// Authenticated API Fetch Wrapper
+async function apiFetch(url, options = {}) {
+  const headers = Object.assign({}, options.headers || {});
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  const response = await fetch(url, { ...options, headers });
+  if (response.status === 401 && authRequired) {
+    handleSessionExpired();
+  }
+  return response;
+}
+
+// Initialize Application
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
-  await loadSystemInfo();
-  await loadPresetsList();
-  connectWebSocket();
+  setupAuthEventListeners();
+  await initAuth();
 });
 
 // Setup All UI Event Listeners
@@ -164,6 +195,170 @@ function setupEventListeners() {
   paramsForm.addEventListener('submit', handleParamsSubmit);
 }
 
+// Setup Supabase Auth Event Listeners
+function setupAuthEventListeners() {
+  if (loginForm) {
+    loginForm.addEventListener('submit', handleLogin);
+  }
+  if (btnLogout) {
+    btnLogout.addEventListener('click', handleLogout);
+  }
+}
+
+// Initialize Supabase Auth & Verify Session
+async function initAuth() {
+  try {
+    const res = await fetch('/api/auth/config');
+    const config = await res.json();
+    authRequired = Boolean(config.authRequired);
+
+    if (!authRequired) {
+      // Supabase is not yet configured in .env
+      loginOverlay.classList.remove('hidden');
+      loginEnvNotice.classList.remove('hidden');
+      loginForm.classList.add('hidden');
+      return false;
+    }
+
+    loginEnvNotice.classList.add('hidden');
+    loginForm.classList.remove('hidden');
+
+    // Supabase is configured; initialize Supabase SDK client
+    if (window.supabase && config.supabaseUrl && config.supabaseAnonKey) {
+      supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+
+      // Check for already active session (from localStorage)
+      const { data: { session }, error } = await supabaseClient.auth.getSession();
+      if (session && session.user) {
+        setAuthenticatedState(session);
+        return true;
+      }
+
+      // Listen for authentication changes
+      supabaseClient.auth.onAuthStateChange((event, session) => {
+        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
+          setAuthenticatedState(session);
+        } else if (event === 'SIGNED_OUT') {
+          setUnauthenticatedState();
+        }
+      });
+    }
+
+    setUnauthenticatedState();
+    return false;
+  } catch (err) {
+    console.error('Erro ao inicializar autenticação:', err);
+    setUnauthenticatedState();
+    return false;
+  }
+}
+
+function setAuthenticatedState(session) {
+  authToken = session.access_token;
+  loginOverlay.classList.add('hidden');
+  userProfileBadge.classList.remove('hidden');
+  userEmailDisplay.textContent = session.user.email || 'Usuário';
+  userAvatar.textContent = (session.user.email ? session.user.email[0] : 'U').toUpperCase();
+  userProfileBadge.title = `Conectado como ${session.user.email}`;
+
+  // Start app connections and data loading
+  loadSystemInfo();
+  loadPresetsList();
+  connectWebSocket();
+}
+
+function setUnauthenticatedState() {
+  authToken = null;
+  userProfileBadge.classList.add('hidden');
+  loginOverlay.classList.remove('hidden');
+  if (socket) {
+    try { socket.close(); } catch (e) {}
+    socket = null;
+  }
+  wsStatus.className = 'status-indicator offline';
+  wsStatus.querySelector('.status-text').textContent = 'Desconectado';
+}
+
+function handleSessionExpired() {
+  showToast('Sua sessão expirou. Faça login novamente.', 'warning');
+  setUnauthenticatedState();
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  loginErrorAlert.classList.add('hidden');
+  loginErrorAlert.textContent = '';
+
+  const email = loginEmail.value.trim();
+  const password = loginPassword.value;
+
+  if (!email || !password) {
+    showLoginError('Por favor, informe e-mail e senha.');
+    return;
+  }
+
+  if (!supabaseClient) {
+    showLoginError('Cliente Supabase não está pronto. Verifique as configurações no .env.');
+    return;
+  }
+
+  // Show loading spinner
+  btnLoginSubmit.disabled = true;
+  loginSpinner.classList.remove('hidden');
+
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      showLoginError(formatAuthError(error));
+      return;
+    }
+
+    if (data && data.session) {
+      showToast(`Bem-vindo, ${data.user.email}!`, 'success');
+      setAuthenticatedState(data.session);
+    }
+  } catch (err) {
+    showLoginError('Erro de conexão ao autenticar: ' + err.message);
+  } finally {
+    btnLoginSubmit.disabled = false;
+    loginSpinner.classList.add('hidden');
+  }
+}
+
+async function handleLogout() {
+  if (confirm('Deseja realmente sair da sua conta?')) {
+    try {
+      if (supabaseClient) {
+        await supabaseClient.auth.signOut();
+      }
+    } catch (e) {
+      console.warn('Erro ao chamar signOut:', e);
+    }
+    setUnauthenticatedState();
+    showToast('Sessão encerrada com sucesso.', 'info');
+  }
+}
+
+function showLoginError(msg) {
+  loginErrorAlert.textContent = msg;
+  loginErrorAlert.classList.remove('hidden');
+}
+
+function formatAuthError(error) {
+  const msg = error.message || '';
+  if (msg.includes('Invalid login credentials')) {
+    return 'E-mail ou senha inválidos. Verifique os dados e tente novamente.';
+  }
+  if (msg.includes('Email not confirmed')) {
+    return 'E-mail ainda não confirmado no Supabase. Confirme seu e-mail antes de entrar.';
+  }
+  return msg || 'Erro ao realizar login.';
+}
+
 // OS Switch Handler
 function setEnvironment(env) {
   if (currentEnv === env) return;
@@ -220,7 +415,8 @@ function updateEnvironmentUI() {
 // REST API Calls
 async function loadSystemInfo() {
   try {
-    const res = await fetch('/api/info');
+    const res = await apiFetch('/api/info');
+    if (!res.ok) return;
     serverInfo = await res.json();
     currentCwd = serverInfo.cwd || '';
     cwdDisplay.textContent = currentCwd;
@@ -244,7 +440,7 @@ async function handleSaveCwd(e) {
   if (!dir) return;
 
   try {
-    const res = await fetch('/api/info/cwd', {
+    const res = await apiFetch('/api/info/cwd', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cwd: dir })
@@ -266,7 +462,8 @@ async function handleSaveCwd(e) {
 
 async function loadPresetsList() {
   try {
-    const res = await fetch('/api/presets');
+    const res = await apiFetch('/api/presets');
+    if (!res.ok) return;
     const presets = await res.json();
     
     presetSelect.innerHTML = '';
@@ -291,7 +488,7 @@ async function loadPresetsList() {
 
 async function loadPreset(filename) {
   try {
-    const res = await fetch(`/api/presets/${encodeURIComponent(filename)}`);
+    const res = await apiFetch(`/api/presets/${encodeURIComponent(filename)}`);
     if (!res.ok) throw new Error('Falha na resposta do servidor');
     currentPreset = await res.json();
     currentPresetFilename = filename;
@@ -311,7 +508,7 @@ async function loadPreset(filename) {
 
 async function saveCurrentPresetToBackend() {
   try {
-    const res = await fetch(`/api/presets/${encodeURIComponent(currentPresetFilename)}`, {
+    const res = await apiFetch(`/api/presets/${encodeURIComponent(currentPresetFilename)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(currentPreset)
@@ -327,8 +524,16 @@ async function saveCurrentPresetToBackend() {
 
 // WebSocket Connection
 function connectWebSocket() {
+  if (authRequired && !authToken) {
+    return;
+  }
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
+
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}`;
+  const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : '';
+  const wsUrl = `${protocol}//${window.location.host}${tokenParam}`;
   
   socket = new WebSocket(wsUrl);
 
@@ -337,10 +542,22 @@ function connectWebSocket() {
     wsStatus.querySelector('.status-text').textContent = 'Online';
   };
 
-  socket.onclose = () => {
+  socket.onclose = (event) => {
     wsStatus.className = 'status-indicator offline';
     wsStatus.querySelector('.status-text').textContent = 'Desconectado';
-    setTimeout(connectWebSocket, 3000);
+    if (event.code === 4001) {
+      console.warn('Conexão WebSocket rejeitada por não autorização.');
+      if (authRequired) {
+        handleSessionExpired();
+      }
+      return;
+    }
+    // Reconnect after 3s if still authenticated
+    if (!authRequired || authToken) {
+      setTimeout(() => {
+        if (!authRequired || authToken) connectWebSocket();
+      }, 3000);
+    }
   };
 
   socket.onerror = (err) => {
@@ -715,7 +932,8 @@ function handleSaveCommandForm(e) {
 async function openPresetsModal() {
   openModal(presetsModal);
   try {
-    const res = await fetch('/api/presets');
+    const res = await apiFetch('/api/presets');
+    if (!res.ok) return;
     const presets = await res.json();
     
     presetsList.innerHTML = '';
@@ -744,7 +962,7 @@ async function openPresetsModal() {
       if (delBtn) {
         delBtn.addEventListener('click', async () => {
           if (confirm(`Excluir o arquivo ${p.filename}?`)) {
-            await fetch(`/api/presets/${encodeURIComponent(p.filename)}`, { method: 'DELETE' });
+            await apiFetch(`/api/presets/${encodeURIComponent(p.filename)}`, { method: 'DELETE' });
             openPresetsModal();
             loadPresetsList();
             showToast('Arquivo excluído', 'info');
@@ -772,7 +990,7 @@ async function handleSaveAsPreset() {
   };
 
   try {
-    const res = await fetch(`/api/presets/${encodeURIComponent(filename)}`, {
+    const res = await apiFetch(`/api/presets/${encodeURIComponent(filename)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(copy)
@@ -814,7 +1032,7 @@ function handleImportFile(e) {
       }
 
       const filename = file.name;
-      const res = await fetch(`/api/presets/${encodeURIComponent(filename)}`, {
+      const res = await apiFetch(`/api/presets/${encodeURIComponent(filename)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed)
