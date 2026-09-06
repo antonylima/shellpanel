@@ -26,6 +26,7 @@ const loginOverlay = document.getElementById('loginOverlay');
 const loginForm = document.getElementById('loginForm');
 const loginEmail = document.getElementById('loginEmail');
 const loginPassword = document.getElementById('loginPassword');
+const btnTogglePassword = document.getElementById('btnTogglePassword');
 const loginErrorAlert = document.getElementById('loginErrorAlert');
 const btnLoginSubmit = document.getElementById('btnLoginSubmit');
 const loginSpinner = document.getElementById('loginSpinner');
@@ -34,6 +35,29 @@ const userProfileBadge = document.getElementById('userProfileBadge');
 const userEmailDisplay = document.getElementById('userEmailDisplay');
 const userAvatar = document.getElementById('userAvatar');
 const btnLogout = document.getElementById('btnLogout');
+
+// DOM Elements: Mobile Architecture
+const appMain = document.getElementById('appMain');
+const tabBtnCommands = document.getElementById('tabBtnCommands');
+const tabBtnTerminal = document.getElementById('tabBtnTerminal');
+const mobileCommandsBadge = document.getElementById('mobileCommandsBadge');
+const mobileTerminalPulseDot = document.getElementById('mobileTerminalPulseDot');
+
+const btnMobileMenuToggle = document.getElementById('btnMobileMenuToggle');
+const mobileDrawerOverlay = document.getElementById('mobileDrawerOverlay');
+const mobileDrawer = document.getElementById('mobileDrawer');
+const btnMobileDrawerClose = document.getElementById('btnMobileDrawerClose');
+const drawerUserEmail = document.getElementById('drawerUserEmail');
+const drawerUserAvatar = document.getElementById('drawerUserAvatar');
+const btnMobileLogout = document.getElementById('btnMobileLogout');
+const mobilePresetSelect = document.getElementById('mobilePresetSelect');
+const btnMobileManagePresets = document.getElementById('btnMobileManagePresets');
+const btnMobileEditCwd = document.getElementById('btnMobileEditCwd');
+const drawerCwdDisplay = document.getElementById('drawerCwdDisplay');
+const mobileShellSelect = document.getElementById('mobileShellSelect');
+const drawerStatusText = document.getElementById('drawerStatusText');
+const drawerStatusCard = document.getElementById('drawerStatusCard');
+const mobileMenuAvatarBadge = document.getElementById('mobileMenuAvatarBadge');
 
 // DOM Elements: General
 const wsStatus = document.getElementById('wsStatus');
@@ -145,6 +169,58 @@ function setupEventListeners() {
   importFileInput.addEventListener('change', handleImportFile);
   btnExportFile.addEventListener('click', handleExportPreset);
 
+  // Mobile Tabs Navigation
+  if (tabBtnCommands) {
+    tabBtnCommands.addEventListener('click', () => setMobileView('commands'));
+  }
+  if (tabBtnTerminal) {
+    tabBtnTerminal.addEventListener('click', () => setMobileView('terminal'));
+  }
+
+  // Mobile Drawer Listeners
+  if (btnMobileMenuToggle) {
+    btnMobileMenuToggle.addEventListener('click', openMobileDrawer);
+  }
+  if (btnMobileDrawerClose) {
+    btnMobileDrawerClose.addEventListener('click', closeMobileDrawer);
+  }
+  if (mobileDrawerOverlay) {
+    mobileDrawerOverlay.addEventListener('click', (e) => {
+      if (e.target === mobileDrawerOverlay) closeMobileDrawer();
+    });
+  }
+  if (mobilePresetSelect) {
+    mobilePresetSelect.addEventListener('change', (e) => {
+      presetSelect.value = e.target.value;
+      loadPreset(e.target.value);
+      closeMobileDrawer();
+    });
+  }
+  if (btnMobileManagePresets) {
+    btnMobileManagePresets.addEventListener('click', () => {
+      closeMobileDrawer();
+      openPresetsModal();
+    });
+  }
+  if (btnMobileEditCwd) {
+    btnMobileEditCwd.addEventListener('click', () => {
+      closeMobileDrawer();
+      newCwdInput.value = currentCwd;
+      openModal(cwdModal);
+    });
+  }
+  if (mobileShellSelect) {
+    mobileShellSelect.addEventListener('change', (e) => {
+      shellSelect.value = e.target.value;
+    });
+  }
+  if (btnMobileLogout) {
+    btnMobileLogout.addEventListener('click', () => {
+      closeMobileDrawer();
+      handleLogout();
+    });
+  }
+
   // CWD Change
   cwdBadge.addEventListener('click', () => {
     newCwdInput.value = currentCwd;
@@ -188,11 +264,41 @@ function setupEventListeners() {
     }
     if (e.key === 'Escape') {
       document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(closeModal);
+      closeMobileDrawer();
     }
   });
 
   // Params form submit
   paramsForm.addEventListener('submit', handleParamsSubmit);
+}
+
+// Mobile Tab View Switcher
+function setMobileView(view) {
+  if (appMain) {
+    appMain.setAttribute('data-mobile-view', view);
+  }
+  if (tabBtnCommands && tabBtnTerminal) {
+    tabBtnCommands.classList.toggle('active', view === 'commands');
+    tabBtnTerminal.classList.toggle('active', view === 'terminal');
+  }
+  if (view === 'terminal' && autoScroll && terminalBody) {
+    setTimeout(() => {
+      terminalBody.scrollTop = terminalBody.scrollHeight;
+    }, 40);
+  }
+}
+
+// Mobile Drawer Controls
+function openMobileDrawer() {
+  if (mobileDrawerOverlay) {
+    mobileDrawerOverlay.classList.remove('hidden');
+  }
+}
+
+function closeMobileDrawer() {
+  if (mobileDrawerOverlay) {
+    mobileDrawerOverlay.classList.add('hidden');
+  }
 }
 
 // Setup Supabase Auth Event Listeners
@@ -202,6 +308,18 @@ function setupAuthEventListeners() {
   }
   if (btnLogout) {
     btnLogout.addEventListener('click', handleLogout);
+  }
+  if (btnTogglePassword && loginPassword) {
+    btnTogglePassword.addEventListener('click', () => {
+      const isPassword = loginPassword.type === 'password';
+      loginPassword.type = isPassword ? 'text' : 'password';
+      const eyeShow = btnTogglePassword.querySelector('.eye-icon-show');
+      const eyeHide = btnTogglePassword.querySelector('.eye-icon-hide');
+      if (eyeShow && eyeHide) {
+        eyeShow.classList.toggle('hidden', isPassword);
+        eyeHide.classList.toggle('hidden', !isPassword);
+      }
+    });
   }
 }
 
@@ -257,9 +375,20 @@ function setAuthenticatedState(session) {
   authToken = session.access_token;
   loginOverlay.classList.add('hidden');
   userProfileBadge.classList.remove('hidden');
-  userEmailDisplay.textContent = session.user.email || 'Usuário';
-  userAvatar.textContent = (session.user.email ? session.user.email[0] : 'U').toUpperCase();
-  userProfileBadge.title = `Conectado como ${session.user.email}`;
+  const userEmail = session.user.email || 'Usuário';
+  const initial = (session.user.email ? session.user.email[0] : 'U').toUpperCase();
+
+  userEmailDisplay.textContent = userEmail;
+  userAvatar.textContent = initial;
+  userProfileBadge.title = `Conectado como ${userEmail}`;
+
+  // Update mobile drawer user info
+  if (drawerUserEmail) drawerUserEmail.textContent = userEmail;
+  if (drawerUserAvatar) drawerUserAvatar.textContent = initial;
+  if (mobileMenuAvatarBadge) {
+    mobileMenuAvatarBadge.textContent = initial;
+    mobileMenuAvatarBadge.classList.remove('hidden');
+  }
 
   // Start app connections and data loading
   loadSystemInfo();
@@ -270,6 +399,10 @@ function setAuthenticatedState(session) {
 function setUnauthenticatedState() {
   authToken = null;
   userProfileBadge.classList.add('hidden');
+  if (mobileMenuAvatarBadge) {
+    mobileMenuAvatarBadge.classList.add('hidden');
+  }
+  closeMobileDrawer();
   loginOverlay.classList.remove('hidden');
   if (socket) {
     try { socket.close(); } catch (e) {}
@@ -277,6 +410,11 @@ function setUnauthenticatedState() {
   }
   wsStatus.className = 'status-indicator offline';
   wsStatus.querySelector('.status-text').textContent = 'Desconectado';
+  if (drawerStatusText) drawerStatusText.textContent = 'Desconectado';
+  if (drawerStatusCard) {
+    const dot = drawerStatusCard.querySelector('.status-dot');
+    if (dot) dot.className = 'status-dot';
+  }
 }
 
 function handleSessionExpired() {
@@ -395,20 +533,24 @@ function updateEnvironmentUI() {
     quickCommandInput.placeholder = 'Digite comando Windows (ex: dir, git status, ping)... [Enter]';
     
     // Update Shell options
-    shellSelect.innerHTML = `
+    const shellHtml = `
       <option value="powershell" selected>PowerShell</option>
       <option value="cmd">CMD</option>
     `;
+    shellSelect.innerHTML = shellHtml;
+    if (mobileShellSelect) mobileShellSelect.innerHTML = shellHtml;
   } else {
     currentEnvBadge.textContent = '🐧 UBUNTU';
     promptSymbol.textContent = 'ubuntu:~$';
     quickCommandInput.placeholder = 'Digite comando Ubuntu / Linux (ex: ls -la, sudo apt update, df -h)... [Enter]';
     
     // Update Shell options
-    shellSelect.innerHTML = `
+    const shellHtml = `
       <option value="bash" selected>Bash</option>
       <option value="sh">sh</option>
     `;
+    shellSelect.innerHTML = shellHtml;
+    if (mobileShellSelect) mobileShellSelect.innerHTML = shellHtml;
   }
 }
 
@@ -421,6 +563,7 @@ async function loadSystemInfo() {
     currentCwd = serverInfo.cwd || '';
     cwdDisplay.textContent = currentCwd;
     cwdDisplay.title = `${currentCwd} (${serverInfo.platform})`;
+    if (drawerCwdDisplay) drawerCwdDisplay.textContent = currentCwd;
 
     // If host platform is Linux, default to Ubuntu/Linux mode
     if (serverInfo.isLinux) {
@@ -450,6 +593,7 @@ async function handleSaveCwd(e) {
       currentCwd = data.cwd;
       cwdDisplay.textContent = currentCwd;
       cwdDisplay.title = currentCwd;
+      if (drawerCwdDisplay) drawerCwdDisplay.textContent = currentCwd;
       closeModal(cwdModal);
       showToast('Pasta de trabalho atualizada!', 'success');
     } else {
@@ -474,10 +618,15 @@ async function loadPresetsList() {
       presetSelect.appendChild(opt);
     });
 
+    if (mobilePresetSelect) {
+      mobilePresetSelect.innerHTML = presetSelect.innerHTML;
+    }
+
     if (presets.length > 0) {
       const defaultFilename = currentEnv === 'ubuntu' ? 'ubuntu.json' : 'default.json';
       const selected = presets.find(p => p.filename === defaultFilename) || presets[0];
       presetSelect.value = selected.filename;
+      if (mobilePresetSelect) mobilePresetSelect.value = selected.filename;
       await loadPreset(selected.filename);
     }
   } catch (err) {
@@ -540,11 +689,14 @@ function connectWebSocket() {
   socket.onopen = () => {
     wsStatus.className = 'status-indicator online';
     wsStatus.querySelector('.status-text').textContent = 'Online';
+    if (drawerStatusText) drawerStatusText.textContent = 'Online (Conectado)';
   };
 
   socket.onclose = (event) => {
     wsStatus.className = 'status-indicator offline';
     wsStatus.querySelector('.status-text').textContent = 'Desconectado';
+    if (drawerStatusText) drawerStatusText.textContent = 'Desconectado';
+    if (mobileTerminalPulseDot) mobileTerminalPulseDot.classList.add('hidden');
     if (event.code === 4001) {
       console.warn('Conexão WebSocket rejeitada por não autorização.');
       if (authRequired) {
@@ -582,6 +734,12 @@ function handleSocketMessage(msg) {
     startProcessTimer();
     btnKillProcess.classList.remove('hidden');
     activeProcessBadge.classList.remove('hidden');
+    if (mobileTerminalPulseDot) mobileTerminalPulseDot.classList.remove('hidden');
+
+    // On mobile screens, automatically switch to the Terminal tab so output is immediately visible
+    if (window.innerWidth <= 900) {
+      setMobileView('terminal');
+    }
     
     const isUbuntu = env === 'ubuntu' || env === 'linux';
     const envPrefix = isUbuntu ? '🐧 [Ubuntu/Linux]' : '🪟 [Windows]';
@@ -594,8 +752,10 @@ function handleSocketMessage(msg) {
   } else if (type === 'error') {
     appendTerminalHtml(`\n<div class="log-exit-error">✖ Erro: ${escapeHtml(message || 'Falha na execução')}</div>`);
     stopProcessTimer();
+    if (mobileTerminalPulseDot) mobileTerminalPulseDot.classList.add('hidden');
   } else if (type === 'exit') {
     stopProcessTimer();
+    if (mobileTerminalPulseDot) mobileTerminalPulseDot.classList.add('hidden');
     const isOk = code === 0;
     const durSec = (duration / 1000).toFixed(2);
     const badgeClass = isOk ? 'log-exit-success' : 'log-exit-error';
@@ -604,6 +764,7 @@ function handleSocketMessage(msg) {
     appendTerminalHtml(`\n<div class="${badgeClass}">✔ [${new Date().toLocaleTimeString()}] ${statusText} em ${durSec}s</div>`);
   } else if (type === 'killed') {
     stopProcessTimer();
+    if (mobileTerminalPulseDot) mobileTerminalPulseDot.classList.add('hidden');
     appendTerminalHtml(`\n<div class="log-exit-error">⏹ Processo interrompido pelo usuário.</div>`);
   }
 }
@@ -750,6 +911,10 @@ function renderCommands() {
 
   commandsGrid.innerHTML = '';
 
+  if (mobileCommandsBadge) {
+    mobileCommandsBadge.textContent = filtered.length;
+  }
+
   if (filtered.length === 0) {
     emptyState.classList.remove('hidden');
     return;
@@ -784,6 +949,10 @@ function renderCommands() {
 
       <div class="command-code-box" title="${escapeHtml(cmd.command)}">
         <code>${escapeHtml(cmd.command)}</code>
+        <button type="button" class="btn-copy-code" title="Copiar comando">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          <span>Copiar</span>
+        </button>
       </div>
 
       ${cmd.description ? `<p class="command-description">${escapeHtml(cmd.description)}</p>` : ''}
@@ -800,6 +969,19 @@ function renderCommands() {
     card.querySelector('.btn-run-command').addEventListener('click', () => {
       executeCommand(cmd.command);
     });
+
+    const btnCopyCode = card.querySelector('.btn-copy-code');
+    if (btnCopyCode) {
+      btnCopyCode.addEventListener('click', (e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(cmd.command);
+        const span = btnCopyCode.querySelector('span');
+        if (span) {
+          span.textContent = 'Copiado!';
+          setTimeout(() => { span.textContent = 'Copiar'; }, 1500);
+        }
+      });
+    }
 
     card.querySelector('.btn-edit').addEventListener('click', () => {
       openCommandModal(cmd);
