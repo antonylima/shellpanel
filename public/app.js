@@ -173,7 +173,12 @@ function setupEventListeners() {
   commandForm.addEventListener('submit', handleSaveCommandForm);
 
   // Preset Select Change
-  presetSelect.addEventListener('change', (e) => loadPreset(e.target.value));
+  presetSelect.addEventListener('change', async (e) => {
+    await loadPreset(e.target.value);
+    if (authRequired && authToken) {
+      showToast(`Preset "${e.target.value}" carregado. Clique em "Subir Locais" para salvar estes comandos no Supabase.`, 'info');
+    }
+  });
   btnManagePresets.addEventListener('click', openPresetsModal);
   btnSaveAsPreset.addEventListener('click', handleSaveAsPreset);
   btnImportFile.addEventListener('click', () => importFileInput.click());
@@ -452,11 +457,13 @@ function setAuthenticatedState(session) {
     mobileMenuAvatarBadge.classList.remove('hidden');
   }
 
-  // Start app connections and data loading
-  loadSystemInfo();
-  loadPresetsList();
-  loadCommands();
-  connectWebSocket();
+  // Start app connections and data loading in proper sequence
+  (async () => {
+    await loadSystemInfo();
+    await loadPresetsList();
+    await loadCommands();
+    connectWebSocket();
+  })();
 }
 
 function setUnauthenticatedState() {
@@ -676,7 +683,10 @@ async function loadPresetsList() {
       const selected = presets.find(p => p.filename === defaultFilename) || presets[0];
       presetSelect.value = selected.filename;
       if (mobilePresetSelect) mobilePresetSelect.value = selected.filename;
-      await loadPreset(selected.filename);
+      // If not authenticated, load the local preset commands
+      if (!authRequired || !authToken) {
+        await loadPreset(selected.filename);
+      }
     }
   } catch (err) {
     console.error('Erro ao listar presets:', err);
@@ -1059,6 +1069,10 @@ function renderCategoryChips() {
     if (cmd.category) categories.add(cmd.category);
   });
 
+  if (!categories.has(currentCategory)) {
+    currentCategory = 'all';
+  }
+
   categoryChips.innerHTML = '';
   categories.forEach(cat => {
     const btn = document.createElement('button');
@@ -1344,6 +1358,19 @@ async function handleSaveCommandForm(e) {
 
   // If Supabase authenticated, persist directly in Supabase
   if (authRequired && authToken) {
+    // Optimistic UI update: show immediately on screen
+    const existingIndex = currentPreset.commands.findIndex(c => c.id === id);
+    const prevCommand = existingIndex >= 0 ? currentPreset.commands[existingIndex] : null;
+    
+    if (existingIndex >= 0) {
+      currentPreset.commands[existingIndex] = cmdPayload;
+    } else {
+      // Put new command at the top of the list
+      currentPreset.commands.unshift(cmdPayload);
+    }
+    renderCategoryChips();
+    renderCommands();
+
     try {
       let res;
       if (existingId) {
@@ -1365,21 +1392,57 @@ async function handleSaveCommandForm(e) {
       const result = await res.json();
 
       if (res.ok) {
-        showToast(existingId ? 'Comando atualizado na nuvem!' : 'Comando salvo no Supabase com sucesso!', 'success');
-        await loadCommands();
+        showToast(existingId ? 'Comando atualizado no Supabase!' : 'Comando salvo direto no Supabase!', 'success');
+        updateCloudBadge('synced');
+        // If the server returned the created record with server generated id, update it
+        if (result.command && result.command.id) {
+          const idx = currentPreset.commands.findIndex(c => c.id === id);
+          if (idx >= 0) {
+            currentPreset.commands[idx] = result.command;
+            renderCommands();
+          }
+        }
         return;
       } else if (result.tableMissing) {
+        // Rollback optimistic update
+        if (existingIndex >= 0 && prevCommand) {
+          currentPreset.commands[existingIndex] = prevCommand;
+        } else {
+          currentPreset.commands = currentPreset.commands.filter(c => c.id !== id);
+        }
+        renderCategoryChips();
+        renderCommands();
         updateCloudBadge('pending');
-        showToast('Tabela de comandos não encontrada no Supabase. Salvo apenas localmente.', 'warning');
+        openModal(sqlModal);
+        showToast('Tabela de comandos não existe no Supabase. Execute o script SQL exibido na tela!', 'warning');
       } else {
+        // Rollback optimistic update on error
+        if (existingIndex >= 0 && prevCommand) {
+          currentPreset.commands[existingIndex] = prevCommand;
+        } else {
+          currentPreset.commands = currentPreset.commands.filter(c => c.id !== id);
+        }
+        renderCategoryChips();
+        renderCommands();
         showToast(result.error || 'Erro ao salvar no Supabase', 'error');
+        return;
       }
     } catch (err) {
-      console.warn('Erro ao chamar API do Supabase:', err);
+      // Rollback optimistic update on failure
+      if (existingIndex >= 0 && prevCommand) {
+        currentPreset.commands[existingIndex] = prevCommand;
+      } else {
+        currentPreset.commands = currentPreset.commands.filter(c => c.id !== id);
+      }
+      renderCategoryChips();
+      renderCommands();
+      console.error('Erro ao chamar API do Supabase:', err);
+      showToast('Erro de comunicação com o Supabase: ' + err.message, 'error');
+      return;
     }
   }
 
-  // Fallback to local preset persistence
+  // Fallback to local preset persistence only if offline / unauthenticated
   const existingIndex = currentPreset.commands.findIndex(c => c.id === id);
   if (existingIndex >= 0) {
     currentPreset.commands[existingIndex] = cmdPayload;
