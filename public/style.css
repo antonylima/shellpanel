@@ -2197,3 +2197,111 @@ textarea,
   border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
   padding-top: 14px;
 }
+
+/* ========================================================
+   SUPABASE CLOUD SYNC & SQL MODAL STYLES
+   ======================================================== */
+
+.cloud-sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #34d399;
+  cursor: default;
+  transition: all 0.2s ease;
+}
+
+.cloud-sync-badge.pending {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+  cursor: pointer;
+}
+
+.cloud-sync-badge.pending:hover {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.cloud-sync-badge.local {
+  background: rgba(100, 116, 139, 0.15);
+  border-color: rgba(100, 116, 139, 0.3);
+  color: #94a3b8;
+}
+
+.modal-card-lg {
+  max-width: 680px;
+  width: 95%;
+}
+
+.modal-header-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-title-icon {
+  font-size: 1.25rem;
+}
+
+.sql-intro-box {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+}
+
+.sql-intro-box a {
+  color: #38bdf8;
+  text-decoration: underline;
+}
+
+.sql-steps-list {
+  margin: 10px 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sql-code-container {
+  display: flex;
+  flex-direction: column;
+  background: #0b0f19;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.sql-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.sql-code-pre {
+  margin: 0;
+  padding: 14px;
+  max-height: 240px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #f1f5f9;
+  background: transparent;
+}

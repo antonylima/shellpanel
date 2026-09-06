@@ -120,6 +120,14 @@ const cwdModal = document.getElementById('cwdModal');
 const cwdForm = document.getElementById('cwdForm');
 const newCwdInput = document.getElementById('newCwdInput');
 
+// Cloud Sync & SQL Setup Modals
+const cloudSyncBadge = document.getElementById('cloudSyncBadge');
+const cloudSyncText = document.getElementById('cloudSyncText');
+const sqlModal = document.getElementById('sqlModal');
+const btnCopySql = document.getElementById('btnCopySql');
+const sqlCodeContent = document.getElementById('sqlCodeContent');
+const btnReloadAfterSql = document.getElementById('btnReloadAfterSql');
+
 // Authenticated API Fetch Wrapper
 async function apiFetch(url, options = {}) {
   const headers = Object.assign({}, options.headers || {});
@@ -255,6 +263,37 @@ function setupEventListeners() {
       closeModal(document.getElementById(modalId));
     });
   });
+
+  // Cloud Sync & SQL Setup Modal Listeners
+  if (btnCopySql && sqlCodeContent) {
+    btnCopySql.addEventListener('click', () => {
+      navigator.clipboard.writeText(sqlCodeContent.innerText);
+      const span = btnCopySql.querySelector('span');
+      if (span) {
+        span.textContent = 'Copiado!';
+        setTimeout(() => { span.textContent = 'Copiar Script SQL'; }, 2000);
+      }
+      showToast('Script SQL copiado com sucesso!', 'success');
+    });
+  }
+
+  if (btnReloadAfterSql) {
+    btnReloadAfterSql.addEventListener('click', async () => {
+      closeModal(sqlModal);
+      showToast('Verificando conexão com o Supabase...', 'info');
+      await loadCommands();
+    });
+  }
+
+  if (cloudSyncBadge) {
+    cloudSyncBadge.addEventListener('click', () => {
+      if (cloudSyncBadge.classList.contains('pending')) {
+        openModal(sqlModal);
+      } else {
+        showToast(`Sincronizado: ${cloudSyncText.textContent}`, 'info');
+      }
+    });
+  }
 
   // Keyboard Shortcuts (Ctrl+F for search, Esc to close modals)
   window.addEventListener('keydown', (e) => {
@@ -393,6 +432,7 @@ function setAuthenticatedState(session) {
   // Start app connections and data loading
   loadSystemInfo();
   loadPresetsList();
+  loadCommands();
   connectWebSocket();
 }
 
@@ -503,22 +543,8 @@ function setEnvironment(env) {
   currentEnv = env;
   updateEnvironmentUI();
 
-  // Suggest / Auto-switch preset if appropriate
-  if (env === 'ubuntu') {
-    const hasUbuntuPreset = Array.from(presetSelect.options).some(o => o.value === 'ubuntu.json');
-    if (hasUbuntuPreset && currentPresetFilename === 'default.json') {
-      loadPreset('ubuntu.json');
-      presetSelect.value = 'ubuntu.json';
-    }
-    showToast('Modo Ubuntu / Linux ativado!', 'info');
-  } else {
-    const hasDefaultPreset = Array.from(presetSelect.options).some(o => o.value === 'default.json');
-    if (hasDefaultPreset && currentPresetFilename === 'ubuntu.json') {
-      loadPreset('default.json');
-      presetSelect.value = 'default.json';
-    }
-    showToast('Modo Windows ativado!', 'info');
-  }
+  // Reload commands for the selected environment
+  loadCommands();
 }
 
 function updateEnvironmentUI() {
@@ -655,6 +681,67 @@ async function loadPreset(filename) {
   }
 }
 
+// Update Cloud Sync Badge in UI
+function updateCloudBadge(status, message) {
+  if (!cloudSyncBadge || !cloudSyncText) return;
+  cloudSyncBadge.className = 'cloud-sync-badge';
+  
+  if (status === 'synced') {
+    cloudSyncBadge.classList.add('synced');
+    cloudSyncBadge.title = 'Comandos sincronizados com o banco de dados Supabase na nuvem';
+    cloudSyncText.textContent = 'Supabase Cloud';
+  } else if (status === 'pending') {
+    cloudSyncBadge.classList.add('pending');
+    cloudSyncBadge.title = 'Tabela no Supabase ainda não criada. Clique aqui para ver e copiar o script SQL.';
+    cloudSyncText.textContent = 'Configurar Banco ⚠️';
+  } else {
+    cloudSyncBadge.classList.add('local');
+    cloudSyncBadge.title = 'Modo de armazenamento local (arquivos JSON)';
+    cloudSyncText.textContent = 'Armazenamento Local';
+  }
+}
+
+// Load commands: fetches from Supabase /api/commands for current user and active environment
+async function loadCommands() {
+  if (!authRequired || !authToken) {
+    // If auth is not enabled, fallback to current preset
+    updateCloudBadge('local');
+    renderCategoryChips();
+    renderCommands();
+    return;
+  }
+
+  try {
+    const res = await apiFetch(`/api/commands?env=${encodeURIComponent(currentEnv)}`);
+    if (!res.ok) throw new Error('Falha ao obter comandos');
+    const data = await res.json();
+
+    if (data.source === 'supabase') {
+      currentPreset.commands = data.commands || [];
+      updateCloudBadge('synced');
+      if (data.seeded) {
+        showToast('Comandos iniciais carregados e salvos no Supabase!', 'success');
+      }
+    } else if (data.tableMissing) {
+      updateCloudBadge('pending');
+      currentPreset.commands = data.commands || [];
+      showToast('Tabela de comandos não encontrada no Supabase. Clique no alerta da nuvem para configurar.', 'warning');
+    } else {
+      currentPreset.commands = data.commands || [];
+      updateCloudBadge('local');
+    }
+
+    renderCategoryChips();
+    renderCommands();
+    updateCategoryDatalist();
+  } catch (err) {
+    console.error('Erro ao carregar comandos:', err);
+    updateCloudBadge('local');
+    renderCategoryChips();
+    renderCommands();
+  }
+}
+
 async function saveCurrentPresetToBackend() {
   try {
     const res = await apiFetch(`/api/presets/${encodeURIComponent(currentPresetFilename)}`, {
@@ -663,11 +750,10 @@ async function saveCurrentPresetToBackend() {
       body: JSON.stringify(currentPreset)
     });
     if (res.ok) {
-      showToast('Alterações salvas com sucesso!', 'success');
       loadPresetsList();
     }
   } catch (err) {
-    showToast('Erro ao salvar no arquivo', 'error');
+    console.error('Erro ao salvar no arquivo local:', err);
   }
 }
 
@@ -987,20 +1073,61 @@ function renderCommands() {
       openCommandModal(cmd);
     });
 
-    card.querySelector('.btn-duplicate').addEventListener('click', () => {
+    card.querySelector('.btn-duplicate').addEventListener('click', async () => {
       const newCmd = {
-        ...cmd,
-        id: 'cmd_' + Date.now(),
-        title: `${cmd.title} (Cópia)`
+        id: 'cmd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        title: `${cmd.title} (Cópia)`,
+        command: cmd.command,
+        category: cmd.category || 'Geral',
+        color: cmd.color || (currentEnv === 'ubuntu' ? 'amber' : 'emerald'),
+        description: cmd.description || '',
+        environment: currentEnv
       };
+
+      if (authRequired && authToken) {
+        try {
+          const res = await apiFetch('/api/commands', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newCmd)
+          });
+          const result = await res.json();
+          if (res.ok) {
+            showToast('Comando duplicado e salvo na nuvem!', 'success');
+            await loadCommands();
+            return;
+          } else if (result.tableMissing) {
+            updateCloudBadge('pending');
+            showToast('Tabela de comandos não encontrada no Supabase.', 'warning');
+          }
+        } catch (e) {
+          console.warn('Falha ao duplicar comando no Supabase:', e);
+        }
+      }
+
       currentPreset.commands.push(newCmd);
       saveCurrentPresetToBackend();
       renderCommands();
       showToast('Comando duplicado!', 'info');
     });
 
-    card.querySelector('.btn-delete').addEventListener('click', () => {
+    card.querySelector('.btn-delete').addEventListener('click', async () => {
       if (confirm(`Deseja realmente remover o botão "${cmd.title}"?`)) {
+        if (authRequired && authToken) {
+          try {
+            const res = await apiFetch(`/api/commands/${encodeURIComponent(cmd.id)}`, {
+              method: 'DELETE'
+            });
+            if (res.ok) {
+              showToast('Comando excluído da nuvem!', 'info');
+              await loadCommands();
+              return;
+            }
+          } catch (e) {
+            console.warn('Falha ao excluir comando do Supabase:', e);
+          }
+        }
+
         currentPreset.commands = currentPreset.commands.filter(c => c.id !== cmd.id);
         saveCurrentPresetToBackend();
         renderCategoryChips();
@@ -1080,9 +1207,10 @@ function openCommandModal(cmd = null) {
   cmdTitle.focus();
 }
 
-function handleSaveCommandForm(e) {
+async function handleSaveCommandForm(e) {
   e.preventDefault();
-  const id = cmdEditId.value || ('cmd_' + Date.now());
+  const existingId = cmdEditId.value.trim();
+  const id = existingId || ('cmd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
   const title = cmdTitle.value.trim();
   const command = cmdText.value.trim();
   const category = cmdCategory.value.trim() || 'Geral';
@@ -1094,20 +1222,67 @@ function handleSaveCommandForm(e) {
     return;
   }
 
-  const newCmdObj = { id, title, command, category, color, description };
-
-  const existingIndex = currentPreset.commands.findIndex(c => c.id === id);
-  if (existingIndex >= 0) {
-    currentPreset.commands[existingIndex] = newCmdObj;
-  } else {
-    currentPreset.commands.push(newCmdObj);
-  }
+  const cmdPayload = {
+    id,
+    title,
+    command,
+    category,
+    color,
+    description,
+    environment: currentEnv
+  };
 
   closeModal(commandModal);
+
+  // If Supabase authenticated, persist directly in Supabase
+  if (authRequired && authToken) {
+    try {
+      let res;
+      if (existingId) {
+        // Update existing command
+        res = await apiFetch(`/api/commands/${encodeURIComponent(existingId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cmdPayload)
+        });
+      } else {
+        // Create new command
+        res = await apiFetch('/api/commands', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cmdPayload)
+        });
+      }
+
+      const result = await res.json();
+
+      if (res.ok) {
+        showToast(existingId ? 'Comando atualizado na nuvem!' : 'Comando salvo no Supabase com sucesso!', 'success');
+        await loadCommands();
+        return;
+      } else if (result.tableMissing) {
+        updateCloudBadge('pending');
+        showToast('Tabela de comandos não encontrada no Supabase. Salvo apenas localmente.', 'warning');
+      } else {
+        showToast(result.error || 'Erro ao salvar no Supabase', 'error');
+      }
+    } catch (err) {
+      console.warn('Erro ao chamar API do Supabase:', err);
+    }
+  }
+
+  // Fallback to local preset persistence
+  const existingIndex = currentPreset.commands.findIndex(c => c.id === id);
+  if (existingIndex >= 0) {
+    currentPreset.commands[existingIndex] = cmdPayload;
+  } else {
+    currentPreset.commands.push(cmdPayload);
+  }
+
   saveCurrentPresetToBackend();
   renderCategoryChips();
   renderCommands();
-  showToast('Comando salvo com sucesso!', 'success');
+  showToast('Comando salvo localmente!', 'info');
 }
 
 // Modal Handlers: Presets & Files
